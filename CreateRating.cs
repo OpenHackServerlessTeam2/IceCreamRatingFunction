@@ -3,6 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Net.Http;
+using System.Web.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -20,7 +21,7 @@ namespace OpenHack.Challenge
 
         public string locationName { get; set; }
 
-        public int rating { get; set; }
+        public int? rating { get; set; }
 
         public string userNotes { get; set; }
     }
@@ -56,18 +57,28 @@ namespace OpenHack.Challenge
 
         public string locationName { get; set; }
 
-        public int rating { get; set; }
+        public int? rating { get; set; }
 
         public string userNotes { get; set; }
     }
 
-    public class BadResponse
-    {
-        public string message { get; set; }
-    }
-
     public static class CreateRating
     {
+        private static ObjectResult ItemNotFoundResponse(string message)
+        {
+            var result = new ObjectResult(message);
+            result.StatusCode = 404;
+            return result;
+        }
+
+        private static async Task<T> GetItemFromApi<T>(HttpClient client, string endpoint)
+        {
+            var response = await client.GetAsync(endpoint);
+            response.EnsureSuccessStatusCode();
+            var responseString = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<T>(responseString);
+        }
+
         [FunctionName("CreateRating")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
@@ -75,46 +86,50 @@ namespace OpenHack.Challenge
         {
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            Rating data = JsonConvert.DeserializeObject<Rating>(requestBody);
+            var data = JsonConvert.DeserializeObject<Rating>(requestBody);
 
-            if (data.userId == null || data.productId == null)
+            if (
+                data.userId == null 
+                || data.productId == null 
+                || data.locationName == null 
+                || data.rating == null)
             {
-                return new BadRequestResult();
+                return new BadRequestObjectResult("Invalid request, required parameters missing. The required parameters are 'userId', 'productId', 'locationName' and 'rating'.");
             }
 
-            HttpClient client = new HttpClient();
+            if (data.rating < 0 || data.rating > 5)
+            {
+                return new BadRequestObjectResult("The 'rating' parameter must be between 0 and 5");
+            }
 
             User user = null;
+            var client = new HttpClient();
 
             try
             {
-                var response = await client.GetAsync($"https://serverlessohapi.azurewebsites.net/api/GetUser?userId={data.userId}");
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
-                user = JsonConvert.DeserializeObject<User>(responseString);
+                user = await GetItemFromApi<User>(
+                    client, 
+                    $"https://serverlessohapi.azurewebsites.net/api/GetUser?userId={data.userId}"
+                );
             }
             catch (HttpRequestException)
             {
-                return new NotFoundResult();
+                return ItemNotFoundResponse($"User not found for userId = {data.userId}");
             }
 
             Product product = null;
+
             try
             {
-                var response = await client.GetAsync($"https://serverlessohapi.azurewebsites.net/api/GetProduct?productId={data.productId}");
-                response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
-                product = JsonConvert.DeserializeObject<Product>(responseString);
+                product = await GetItemFromApi<Product>(
+                    client, 
+                    $"https://serverlessohapi.azurewebsites.net/api/GetProduct?productId={data.productId}"
+                );
             }
             catch (HttpRequestException)
             {
-                return new NotFoundResult();
+                return ItemNotFoundResponse($"Product not found for productId = {data.productId}");
             }
-
-            // if (data.rating < 0 || data.rating > 5)
-            // {
-            //     return new JsonResult(400, JsonConvert.DeserializeObject<BadResponse>("message = Rating must be between 0 and 5"));
-            // }
 
             var finalResponse = new Response()
             {
