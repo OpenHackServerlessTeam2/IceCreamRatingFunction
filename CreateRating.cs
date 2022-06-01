@@ -82,6 +82,11 @@ namespace OpenHack.Challenge
         [FunctionName("CreateRating")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
+            [CosmosDB(
+                databaseName: "OpenHack",
+                collectionName: "Rating",
+                ConnectionStringSetting = "RatingCosmosConnectionString")]
+                IAsyncCollector<Response> ratingOut,
             ILogger log)
         {
 
@@ -141,6 +146,8 @@ namespace OpenHack.Challenge
                 rating = data.rating,
                 userNotes = data.userNotes
             };
+
+            await ratingOut.AddAsync(finalResponse);
 
             return new JsonResult(finalResponse);
         }
