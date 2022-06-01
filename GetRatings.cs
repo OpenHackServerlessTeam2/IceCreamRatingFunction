@@ -14,9 +14,6 @@ using System.Linq;
 
 namespace OpenHack.Challenge
 {
-   
-    
-
     public static class GetRatings
     {
         private static ObjectResult ItemNotFoundResponse(string message)
