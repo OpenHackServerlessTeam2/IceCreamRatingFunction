@@ -1,0 +1,7 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "RatingCosmosConnectionString": "AccountEndpoint=https://rating-cosmos.documents.azure.com:443/;AccountKey=mfNUi27fLhnuTk090fnWicQ4lPjH7sRSImT2pIcjQUCHIWhtcYW7WQI2AACoWF02nSvhKi99vmQ1MPJbteNRoQ==;"
+  }
+}
